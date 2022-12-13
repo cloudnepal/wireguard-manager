@@ -3,6 +3,8 @@
 
 # Require script to be run as root
 function super-user-check() {
+  # This code checks to see if the script is running with root privileges.
+  # If it is not, it will exit with an error message.
   if [ "${EUID}" -ne 0 ]; then
     echo "Error: You need to run this script as administrator."
     exit
@@ -14,6 +16,9 @@ super-user-check
 
 # Get the current system information
 function system-information() {
+  # CURRENT_DISTRO is the ID of the current system
+  # CURRENT_DISTRO_VERSION is the VERSION_ID of the current system
+  # CURRENT_DISTRO_MAJOR_VERSION is the major version of the current system (e.g. "16" for Ubuntu 16.04)
   if [ -f /etc/os-release ]; then
     # shellcheck source=/dev/null
     source /etc/os-release
@@ -67,6 +72,10 @@ installing-system-requirements
 
 # Checking For Virtualization
 function virt-check() {
+  # This code checks if the system is running in a supported virtualization.
+  # It returns the name of the virtualization if it is supported, or "none" if
+  # it is not supported. This code is used to check if the system is running in
+  # a virtual machine, and if so, if it is running in a supported virtualization.
   CURRENT_SYSTEM_VIRTUALIZATION=$(systemd-detect-virt)
   case ${CURRENT_SYSTEM_VIRTUALIZATION} in
   "kvm" | "none" | "qemu" | "lxc" | "microsoft" | "vmware" | "xen" | "amazon") ;;
@@ -82,6 +91,11 @@ virt-check
 
 # Lets check the kernel version
 function kernel-check() {
+  # Check that the kernel version is at least 3.1.0
+  # This is necessary because the kernel version is used to
+  # determine if the correct kernel modules are installed
+  # and the correct device name for the network interface
+  # is set.
   CURRENT_KERNEL_VERSION=$(uname --kernel-release | cut --delimiter="." --fields=1-2)
   CURRENT_KERNEL_MAJOR_VERSION=$(echo "${CURRENT_KERNEL_VERSION}" | cut --delimiter="." --fields=1)
   CURRENT_KERNEL_MINOR_VERSION=$(echo "${CURRENT_KERNEL_VERSION}" | cut --delimiter="." --fields=2)
@@ -104,6 +118,8 @@ kernel-check
 
 # Only allow certain init systems
 function check-current-init-system() {
+  # This code checks if the current init system is systemd or sysvinit
+  # If it is neither, the script exits
   CURRENT_INIT_SYSTEM=$(ps --no-headers -o comm 1)
   case ${CURRENT_INIT_SYSTEM} in
   *"systemd"* | *"init"*) ;;
@@ -119,6 +135,9 @@ check-current-init-system
 
 # Check if there are enough space to continue with the installation.
 function check-disk-space() {
+  # Checks to see if there is more than 1 GB of free space on the drive
+  # where the user is installing to. If there is not, it will exit the
+  # script.
   FREE_SPACE_ON_DRIVE_IN_MB=$(df -m / | tr --squeeze-repeats " " | tail -n1 | cut --delimiter=" " --fields=4)
   if [ "${FREE_SPACE_ON_DRIVE_IN_MB}" -le 1024 ]; then
     echo "Error: More than 1 GB of free space is needed to install everything."
@@ -213,6 +232,7 @@ fi
 
 # Get the network information
 function get-network-information() {
+  # This function will return the IPv4 address of the default interface
   DEFAULT_INTERFACE_IPV4="$(curl --ipv4 --connect-timeout 5 --tlsv1.3 --silent 'https://api.ipengine.dev' | jq -r '.network.ip')"
   if [ -z "${DEFAULT_INTERFACE_IPV4}" ]; then
     DEFAULT_INTERFACE_IPV4="$(curl --ipv4 --connect-timeout 5 --tlsv1.3 --silent 'https://icanhazip.com')"
@@ -787,6 +807,9 @@ if [ ! -f "${WIREGUARD_CONFIG}" ]; then
 
   # What would you like to name your first WireGuard peer?
   function client-name() {
+    # If the CLIENT_NAME variable is empty, then prompt the user for a name.
+    # If the user doesn't enter a name, then generate a random name for them.
+    # If the user enters a name, then use that name.
     if [ -z "${CLIENT_NAME}" ]; then
       echo "Let's name the WireGuard Peer. Use one word only, no special characters, no spaces."
       read -rp "Client name:" -e -i "$(openssl rand -hex 50)" CLIENT_NAME
@@ -801,6 +824,9 @@ if [ ! -f "${WIREGUARD_CONFIG}" ]; then
 
   # Automatically remove wireguard peers after a period of time.
   function auto-remove-confg() {
+    # Ask the user if they would like to expire the peer after a certain period of time.
+    # If the user chooses to expire the peer after a certain period of time, it will enable the cron service.
+    # If the user chooses not to expire the peer after a certain period of time, it will not enable the cron service. 
     echo "Would you like to expire the peer after a certain period of time?"
     echo "  1) Every Year (Recommended)"
     echo "  2) No"
@@ -827,6 +853,10 @@ if [ ! -f "${WIREGUARD_CONFIG}" ]; then
 
   # Lets check the kernel version and check if headers are required
   function install-kernel-headers() {
+    # Checks the current kernel version.
+    # Checks if the current kernel version is older than the allowed kernel version.
+    # Checks the current Linux distribution.
+    # Installs the kernel headers for the current kernel version.
     ALLOWED_KERNEL_VERSION="5.6"
     ALLOWED_KERNEL_MAJOR_VERSION=$(echo ${ALLOWED_KERNEL_VERSION} | cut --delimiter="." --fields=1)
     ALLOWED_KERNEL_MINOR_VERSION=$(echo ${ALLOWED_KERNEL_VERSION} | cut --delimiter="." --fields=2)
@@ -865,6 +895,10 @@ if [ ! -f "${WIREGUARD_CONFIG}" ]; then
 
   # Install resolvconf OR openresolv
   function install-resolvconf-or-openresolv() {
+    # It checks if resolvconf is already installed.
+    # If resolvconf is not installed, it will check what distribution you are running, and install the appropriate package.
+    # If your distribution is not listed, it will not install resolvconf.
+    # If you want to have resolvconf installed, you will have to install it manually.
     if [ ! -x "$(command -v resolvconf)" ]; then
       if { [ "${CURRENT_DISTRO}" == "ubuntu" ] || [ "${CURRENT_DISTRO}" == "debian" ] || [ "${CURRENT_DISTRO}" == "raspbian" ] || [ "${CURRENT_DISTRO}" == "pop" ] || [ "${CURRENT_DISTRO}" == "kali" ] || [ "${CURRENT_DISTRO}" == "linuxmint" ] || [ "${CURRENT_DISTRO}" == "neon" ]; }; then
         apt-get install resolvconf -y
@@ -1147,6 +1181,8 @@ else
       wg-quick down ${WIREGUARD_PUB_NIC}
       ;;
     4) # Restart WireGuard
+      # It checks whether the init system is "systemd" or "init"
+      # It restarts the WireGuard service accordingly.
       if [[ "${CURRENT_INIT_SYSTEM}" == *"systemd"* ]]; then
         systemctl restart wg-quick@${WIREGUARD_PUB_NIC}
       elif [[ "${CURRENT_INIT_SYSTEM}" == *"init"* ]]; then
@@ -1288,6 +1324,10 @@ PublicKey = ${SERVER_PUBKEY}" >>${WIREGUARD_CLIENT_PATH}/"${NEW_CLIENT_NAME}"-${
       echo "Client config --> ${WIREGUARD_CLIENT_PATH}/${NEW_CLIENT_NAME}-${WIREGUARD_PUB_NIC}.conf"
       ;;
     6) # Remove WireGuard Peer
+      # It lists all the WireGuard clients that you can remove
+      # It asks you to select a WireGuard client that you would like to remove
+      # It removes the client from WireGuard
+      # It removes the client's config file from your server
       echo "Which WireGuard peer would you like to remove?"
       grep start ${WIREGUARD_CONFIG} | cut --delimiter=" " --fields=2
       read -rp "Peer's name:" REMOVECLIENT
@@ -1301,6 +1341,11 @@ PublicKey = ${SERVER_PUBKEY}" >>${WIREGUARD_CLIENT_PATH}/"${NEW_CLIENT_NAME}"-${
       crontab -l | grep --invert-match "${REMOVECLIENT}" | crontab -
       ;;
     7) # Reinstall WireGuard
+      # Grabs the current init system
+      # Grabs the current distribution
+      # Disables, stops, and removes the WireGuard interface
+      # Checks the distribution and reinstalls the WireGuard tools
+      # Re-enables and restarts the WireGuard interface
       if [[ "${CURRENT_INIT_SYSTEM}" == *"systemd"* ]]; then
         systemctl disable --now wg-quick@${WIREGUARD_PUB_NIC}
       elif [[ "${CURRENT_INIT_SYSTEM}" == *"init"* ]]; then
@@ -1417,6 +1462,10 @@ PublicKey = ${SERVER_PUBKEY}" >>${WIREGUARD_CLIENT_PATH}/"${NEW_CLIENT_NAME}"-${
       crontab -l | grep --invert-match "${CURRENT_FILE_PATH}" | crontab -
       ;;
     9) # Update the script
+      # Check for updates to WireGuard Manager.
+      # Check for updates to the Unbound root hints file.
+      # Check for updates to the Unbound hosts file.
+      # If any of the above files are updated, restart Unbound.
       CURRENT_WIREGUARD_MANAGER_HASH=$(openssl dgst -sha3-512 "${CURRENT_FILE_PATH}" | cut --delimiter=" " --fields=2)
       NEW_WIREGUARD_MANAGER_HASH=$(curl --silent "${WIREGUARD_MANAGER_UPDATE}" | openssl dgst -sha3-512 | cut --delimiter=" " --fields=2)
       if [ "${CURRENT_WIREGUARD_MANAGER_HASH}" != "${NEW_WIREGUARD_MANAGER_HASH}" ]; then
@@ -1448,6 +1497,11 @@ PublicKey = ${SERVER_PUBKEY}" >>${WIREGUARD_CLIENT_PATH}/"${NEW_CLIENT_NAME}"-${
       fi
       ;;
     10) # Backup WireGuard Config
+      # It checks if a backup file already exists and removes it if it does.
+      # It checks if a folder for the backup exists and creates it if it doesn't.
+      # It checks if the WireGuard config folder exists and creates a backup if it does.
+      # It generates a random password and saves it to a file for later use.
+      # It creates a ZIP file of the WireGuard config folder and encrypts it using the password.
       if [ -f "${WIREGUARD_CONFIG_BACKUP}" ]; then
         rm --force ${WIREGUARD_CONFIG_BACKUP}
       fi
@@ -1461,6 +1515,11 @@ PublicKey = ${SERVER_PUBKEY}" >>${WIREGUARD_CLIENT_PATH}/"${NEW_CLIENT_NAME}"-${
       fi
       ;;
     11) # Restore WireGuard Config
+      # Checks if the backup file exists
+      # Asks the user for the backup password
+      # If the password is empty, the process stops
+      # If the password is not empty, the backup is extracted to the original WireGuard config folder
+      # The WireGuard service is restarted to apply the changes
       if [ ! -f "${WIREGUARD_CONFIG_BACKUP}" ]; then
         exit
       fi
@@ -1477,6 +1536,9 @@ PublicKey = ${SERVER_PUBKEY}" >>${WIREGUARD_CLIENT_PATH}/"${NEW_CLIENT_NAME}"-${
       fi
       ;;
     12) # Change the IP address of your wireguard interface.
+      # Check if the public interface is using IPv4 or IPv6
+      # If the public interface is using IPv4 / IPv6 it will replace the old server host with the new server host in the WireGuard configuration file
+      # It will also replace the old server host with the new server host in all the client configuration files
       get-network-information
       CURRENT_IP_METHORD=$(head --lines=1 ${WIREGUARD_CONFIG} | cut --delimiter=" " --fields=4)
       if [[ ${CURRENT_IP_METHORD} != *"["* ]]; then
@@ -1502,6 +1564,12 @@ PublicKey = ${SERVER_PUBKEY}" >>${WIREGUARD_CLIENT_PATH}/"${NEW_CLIENT_NAME}"-${
       done
       ;;
     13) # Change the wireguard interface's port number.
+      # Read the first line of the WireGuard config file and extract the port number from it.
+      # Until the NEW_SERVER_PORT is a number between 1 and 65535, ask for a custom port.
+      # If the port is already in use, exit the script
+      # If the port is different from the current port, replace the port number in the config file.
+      # Read the client names from the config file and create a list of them.
+      # For each client name, replace the port number in the client config fille.
       OLD_SERVER_PORT=$(head --lines=1 ${WIREGUARD_CONFIG} | cut --delimiter=" " --fields=4 | cut --delimiter=":" --fields=2)
       until [[ "${NEW_SERVER_PORT}" =~ ^[0-9]+$ ]] && [ "${NEW_SERVER_PORT}" -ge 1 ] && [ "${NEW_SERVER_PORT}" -le 65535 ]; do
         read -rp "Custom port [1-65535]: " -e -i 51820 NEW_SERVER_PORT
@@ -1527,6 +1595,11 @@ PublicKey = ${SERVER_PUBKEY}" >>${WIREGUARD_CLIENT_PATH}/"${NEW_CLIENT_NAME}"-${
       done
       ;;
     14) # All wireguard peers should be removed from your interface
+      # Grabs the list of clients in the config file
+      # Iterates over each client and:
+      # Removes the client from the server
+      # Removes the client's config from the server
+      # Removes the client from the cron job
       COMPLETE_CLIENT_LIST=$(grep start ${WIREGUARD_CONFIG} | cut --delimiter=" " --fields=2)
       for CLIENT_LIST_ARRAY in ${COMPLETE_CLIENT_LIST}; do
         USER_LIST[ADD_CONTENT]=${CLIENT_LIST_ARRAY}
@@ -1544,6 +1617,11 @@ PublicKey = ${SERVER_PUBKEY}" >>${WIREGUARD_CLIENT_PATH}/"${NEW_CLIENT_NAME}"-${
       done
       ;;
     15) # Generate QR code.
+      # Asks for the name of the peer for which you want to generate a QR code.
+      # Lists all available peers.
+      # Reads the user input.
+      # Checks if a configuration file with the same name exists.
+      # If it exists, it generates a QR code and prints the path to the configuration file.
       echo "Which WireGuard peer would you like to generate a QR code for?"
       grep start ${WIREGUARD_CONFIG} | cut --delimiter=" " --fields=2
       read -rp "Peer's name:" VIEW_CLIENT_INFO
@@ -1553,6 +1631,13 @@ PublicKey = ${SERVER_PUBKEY}" >>${WIREGUARD_CLIENT_PATH}/"${NEW_CLIENT_NAME}"-${
       fi
       ;;
     16)
+      # This code checks for unbound and runs the unbound-checkconf and unbound-host commands to check the config file.
+      # It looks for the "no errors" string to see if there are any errors in the config file
+      # and the "secure" string to see if the DNS-SEC is configured correctly.
+      # If it finds an error, it will write a message to the log file.
+      # If the checks are successful, there will be no output.
+      # The unbound-host command uses the api.ipengine.dev domain to check for DNS-SEC.
+      # This domain is used because it is a domain that is signed by Cloudflare.
       if [ -x "$(command -v unbound)" ]; then
         if [[ "$(unbound-checkconf ${UNBOUND_CONFIG})" != *"no errors"* ]]; then
           echo "We found an error on your unbound config file located at ${UNBOUND_CONFIG}"
